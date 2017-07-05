@@ -5,10 +5,8 @@ Created on Fri Mar 24 14:37:19 2017
 @author: Jack_2
 """
 import json
-import pickle
 import numpy as np
 import time
-import random
 from sklearn.utils import shuffle
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
@@ -23,14 +21,15 @@ from sklearn.utils import shuffle
 from sklearn.metrics import r2_score
 import math
 import matplotlib.pyplot as plt
-import seaborn as sns 
-import pandas as pd
 import violinPlots as vp
 from sklearn.model_selection import KFold
 import sys
 import iterators as it
 import supplementals as sup
+import ae
+from theano import tensor as T
 from sklearn import preprocessing as preproc
+
 allCV = []
 allMSE = []
 window = []
@@ -70,7 +69,7 @@ def CV(clf, train, train_label, test, test_label, flag = "window", k=5,
 ''' Train and prediction, also returns cross validation score with k = 5 '''
 def trainAndPredict(train, train_label, test, test_label, classifier = "randforest", num=[10], flag="window",
                     calCV = True, fullPred = False, getRegression = False, getFeatImportance = False,
-                    verbose = False, initLrnRate = 0.0001, plot=True):
+                    verbose = False, initLrnRate = 1e-3, plot=True):
     print classifier+' architecture'
     print '------------------------'
     if classifier == "randforest":
@@ -82,6 +81,12 @@ def trainAndPredict(train, train_label, test, test_label, classifier = "randfore
         clf = RandomForestRegressor(n_estimators=num[0], verbose = True, max_depth = depth)
     elif classifier == "RBM":
         clf = BernoulliRBM(n_components=2)
+    elif classifier == "ae":
+        act_fn = T.nnet.sigmoid
+        out_fn = act_fn
+        a = ae.AutoEncoder(np.array(train), 50, act_fn, out_fn)
+        a.train()
+        sys.exit()
     elif classifier == "MLPR":
         a_fns = ["identity", "logistic", "tanh", "relu"]
         solvers = ["adam", "sgd", "lbfgs"]
@@ -101,7 +106,8 @@ def trainAndPredict(train, train_label, test, test_label, classifier = "randfore
         print '\n'
         clf = MLPR(hidden_layer_sizes=(layers), activation=act_fn, solver=solv, learning_rate=lrn_rate,
                    max_iter=max_iteration, verbose=False, shuffle = False, learning_rate_init = initLrnRate,
-                   tol=1e-4, momentum = 0.9, nesterovs_momentum=True)
+                   tol=1e-4, momentum = 0.9, nesterovs_momentum=True, alpha = 1e1, beta_1 = 0.2, 
+                   beta_2 = 0.8)
     elif classifier == "linreg":
         clf = LinearRegression()
     elif classifier == "SVR":
@@ -123,7 +129,7 @@ def trainAndPredict(train, train_label, test, test_label, classifier = "randfore
             print "-------------------------------------"
             print "loss:", clf.loss_          
             print "coefs:",np.shape(clf.coefs_[0]), len(clf.coefs_)
-            pickle.dump((clf.coefs_), open("NN_weights_test_0.json", "w"))
+#            pickle.dump((clf.coefs_), open("NN_weights_test_0.json", "w"))
             print "params:",clf.get_params
             if plot:
                 ''' Sum by row '''
@@ -180,10 +186,10 @@ def classify(classifier, train_feat, train_lab, test_feat, test_lab, flag,
     if classifier == "randforest":
         layers = [40]
     
-    if classifier == "MLPR":
+    if classifier == "MLPR" or classifier == "ae":
         layers = [len(train_feat[0]), len(train_feat[0])-1]
 #        layers = [1]
-    
+        
     if classifier == "SVR":
         layers = None
         
@@ -309,8 +315,10 @@ def classifierIterator(predictor, train_feat, train_lab, test_feat, test_lab, wi
 def returnData(flag = "Partial"):
     if flag == "Full":
         root = "Fullfeatures_RF_BP_DISTANCE/"
-    else:
+    elif flag == "Partial":
         root = "Subfeatures_RF_BP_distance/"
+    elif flag == "same_chr":
+        root = "Same_chr_features/"
         
     train_features = root+"train_features.txt"
     train_labels = root+"train_labels.txt"
@@ -338,12 +346,19 @@ def returnData(flag = "Partial"):
         train_lab = train_lab+tmp_train_lab[:endind]
         train_feat, train_lab = shuffle(train_feat, train_lab)
     print "Training instances:", len(train_feat), "Testing instances:", len(test_feat)
+    
+    scale = False
+    if scale:
+         min_max_scaler = preproc.MinMaxScaler()
+         train_feat = min_max_scaler.fit_transform(train_feat)
+         test_feat = min_max_scaler.fit_transform(test_feat)
 #    print train_feat[200000:200010], train_lab[200000:200010]
     return train_feat, train_lab, test_feat, test_lab
     
 if __name__=="__main__":
     print >> sys.stderr, "Reading inputs..."
-    train_feat, train_lab, test_feat, test_lab = returnData("Full")
+    prefix = ["Full", "Partial", "same_chr"]
+    train_feat, train_lab, test_feat, test_lab = returnData(prefix[2])
 #    print max(train_lab), min(train_lab)
 #    print max(test_lab), min(test_lab)
     
@@ -353,8 +368,8 @@ if __name__=="__main__":
         X.append(i)
         print "------ Window size ", i," -----"
         classifierIterator("MLPR", train_feat, train_lab, 
-                           test_feat, test_lab, i, predCV = False,
-                           predFull = True, iterateForest = False, iterateNN = False, 
+                           test_feat, test_lab, i, predCV = True,
+                           predFull = False, iterateForest = False, iterateNN = False, 
                            iterateConv = False, distance="rf", flag="window", v =  True)
 #        classifierIterator(train_feat, train_lab, test_feat, test_lab, i, flag="rc")
 

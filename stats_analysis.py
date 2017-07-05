@@ -6,7 +6,7 @@ Created on Sat Mar 25 11:30:20 2017
 """
 import json
 import matplotlib.pyplot as plt
-
+import lab_specific_heatmaps as lsh
 def labelDistribution(labels, tag):
     fig1 = plt.figure()
     ax1 = fig1.add_subplot(111)
@@ -91,7 +91,9 @@ def scatterDistanceVSLabel(distance, labels):
 #    fig2.savefig(tag+"_distance.jpg")
     
 if __name__=='__main__':
-    train_feat, train_lab, test_feat, test_lab = returnData("Full")
+    prefix = "Full"
+    train_feat, train_lab, test_feat, test_lab = returnData(prefix)
+    print len(train_feat), len(test_feat)
     train_distance_bp = distanceOnlyFeature(train_feat, flag="bp")
     train_distance_rf = distanceOnlyFeature(train_feat, flag="rf")
     test_distance_bp = distanceOnlyFeature(test_feat, flag="bp")
@@ -101,11 +103,14 @@ if __name__=='__main__':
 #    print len(train_feat), len(train_test_feat)
 #    print len(distanceOnly), len(train_lab)
 #    scatterDistanceVSLabel(train_distance_rf, train_lab)
-    split(train_distance_rf, train_lab, "training")
+#    split(train_distance_rf, train_lab, "training")
 #    split(train_test_feat, train_test_lab, "testing")
 #    labelDistribution(train_lab, "training")
 #    distanceDistribution(train_distance_rf, "training")
 #    labelDistribution(train_test_lab)
 #    distanceDistribution(train_test_distanceOnly)
     
-    
+    ''' label specific heatmap '''
+    lab_dict = lsh.splitByLabels(train_feat, train_lab, prefix, write=True)
+#    lsh.avgHeatMaps(lab_dict, prefix)
+    lsh.varHeatMaps(lab_dict, prefix)
