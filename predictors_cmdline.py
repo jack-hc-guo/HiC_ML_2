@@ -28,15 +28,16 @@ from sklearn import preprocessing as preproc
 
 ''' Supplementals '''
 import math
-import matplotlib.pyplot as plt
-import violinPlots as vp
+#import matplotlib.pyplot as plt
+#import violinPlots as vp
 import sys
-import iterators as it
-import supplementals as sup
+#import iterators as it
+#import supplementals as sup
 import json
 import numpy as np
 import time
-import lab_specific_heatmaps as lsh
+#import lab_specific_heatmaps as lsh
+import argparse
 
 allCV = []
 allMSE = []
@@ -83,7 +84,7 @@ def count_fun(arr, threshold):
 ''' Train and prediction, also returns cross validation score with k = 5 '''
 def trainAndPredict(train, train_label, test, test_label, classifier = "randforest", num=[10], flag="window",
                     calCV = True, fullPred = False, getRegression = False, getFeatImportance = False,
-                    verbose = False, initLrnRate = 1e-3, plot=True):
+                    verbose = False, initLrnRate = 1e-3, plot=False):
     print classifier+' architecture'
     print '------------------------'
     if classifier == "randforest":
@@ -247,15 +248,25 @@ def classify(classifier, train_feat, train_lab, test_feat, test_lab, flag,
         print "Test Error:", fullTestScore
 
 
-def classifierIterator(predictor, train_feat, train_lab, test_feat, test_lab, win_size, 
-                       flag="window", distance = "bp",
-                       iterateForest = False, iterateNN = False, iterateConv = False, 
-                       predCV = True, predFull = False, v = False):
+def classifierIterator(predictor, train_feat, train_lab, test_feat, test_lab, win_size, mode,
+                       flag="window", distance = "bp", v = False):
     print "Parameters:"
     print "--------------"
     print "Distance: ", distance
     print "Feature mode: ", flag
+    predFull, predCV, iterateForest, iterateNN, iterateConv = False, False, False, False, False
     
+    if mode == "predFull":
+        predFull = True
+    elif mode == "predCV":
+        predCV = True
+    elif mode == "iterateForest":
+        iterateForest = True
+    elif mode == "iterateNN":
+        iterateNN = True
+    elif mode == "iterateConv":
+        iterateConv = True
+        
     if flag == "window":    
         ''' Defines indices of window '''
         tmp = []
@@ -278,17 +289,6 @@ def classifierIterator(predictor, train_feat, train_lab, test_feat, test_lab, wi
             tmp.append(24+i*7)
         tmp = sorted(tmp)
         print tmp
-    elif flag == "rc_diag":
-        ''' Use row, column and diagonal only '''
-        tmp = []
-        t = win_size/2+1
-        tmp.append(24)
-        for i in range(1, t):
-            tmp.append(24-i)
-            tmp.append(24+i)
-            tmp.append(24-i*7)
-            tmp.append(24+i*7)
-        tmp = sorted(tmp)
     else:
         print "Invalid mode"
         sys.exit()
@@ -426,21 +426,39 @@ def returnData(flag = "Partial"):
     return train_feat, train_lab, test_feat, test_lab
     
 if __name__=="__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-p", "--prefix", required = True,
+    	help = "prefix of file path: Full, Partial, Reflected")
+    ap.add_argument("-s", "--size", required = False, default=7,
+    	help = "window size to be considered: 1, 3, 5, 7. Default = 7")
+    ap.add_argument("-c", "--classifier", required = False, default = "MLPR",
+      help = "classifier to use: randforest, MLPR, RBM, ae. Default = MLPR")
+    ap.add_argument("-m", "--mode", required = False, default = "predFull",
+      help = "mode of prediction: predCV, predFull, iterateForest, iterateNN, iterateConv. Default = predFull")
+    ap.add_argument("-d", "--distance", required = False, default = "rf", 
+      help = "distance to be used: rf, bp. Default = rf")
+    ap.add_argument("-f", "--flag", required = False, default = "window",
+      help = "input feature type: window, row+column. Default = window")
+    ap.add_argument("-v", "--verbose", required = False, default = False,
+      help = "Default = False")
+    ap.add_argument("-o", "--out", required = False, default = "log.txt",
+                    help = "log file to be written to")
+
+    args = vars(ap.parse_args())
+
     print >> sys.stderr, "Reading inputs..."
-    prefix = ["Full", "Partial", "same_chr"]
-    train_feat, train_lab, test_feat, test_lab = returnData(prefix[0])
+    train_feat, train_lab, test_feat, test_lab = returnData(args["prefix"])
 #    print max(train_lab), min(train_lab)
 #    print max(test_lab), min(test_lab)
     
     start_time = time.time()
     X = []
-    for i in range(7, 8, 2):
+    for i in range(args["size"], args["size"]+1, 2):
         X.append(i)
         print "------ Window size ", i," -----"
-        classifierIterator("RBM", train_feat, train_lab, 
-                           test_feat, test_lab, i, predCV = False,
-                           predFull = True, iterateForest = False, iterateNN = False, 
-                           iterateConv = False, distance="rf", flag="window", v =  True)
+        classifierIterator(args["classifier"], train_feat, train_lab, 
+                           test_feat, test_lab, i, mode = args["mode"], distance= args["distance"], 
+                           flag = args["flag"], v = args["verbose"])
 #        classifierIterator(train_feat, train_lab, test_feat, test_lab, i, flag="rc")
 
     print("--- %s minutes ---" % ((time.time() - start_time)/60))
